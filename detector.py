@@ -23,20 +23,29 @@ MOVING_AVERAGE_SIZE = 5
 class Beacon:
     name: str
     max_rssi: int
+    recovery_rssi: int
     token_description: str
     recent: deque = field(default_factory=lambda:deque([-1000], maxlen=MOVING_AVERAGE_SIZE), init=False)
+    too_close: bool = field(default=False, init=False)
+
+    def __post_init__(self):
+        if self.recovery_rssi >= self.max_rssi:
+            raise Exception("Recovery RSSI must be less than Max RSSI")
 
     @property
     def recent_moving_average(self):
         return sum(self.recent) / len(self.recent)
     def add_recent(self, value):
         self.recent.append(value)
-    def too_close(self):
-        return self.recent_moving_average > self.max_rssi
+        print(f"Appending {value} to {self.name}")
+        if self.too_close and self.recent_moving_average <= self.recovery_rssi:
+            self.too_close = False
+        elif not self.too_close and self.recent_moving_average >= self.max_rssi:
+            self.too_close = True
 
 BEACONS = {
-    '80:e4:da:71:1b:75': Beacon('Minidou', -75, 'Flic button'),
-    'fb:ca:63:b8:c7:2b': Beacon('Rigatoni', -80, 'Fitbit')
+    '80:e4:da:71:1b:75': Beacon('Minidou', -68, -71, 'Flic button'),
+    'fb:ca:63:b8:c7:2b': Beacon('Rigatoni', -80, -85, 'Fitbit')
 }
 
 class ScanPrint(btle.DefaultDelegate):
@@ -73,7 +82,7 @@ def main():
             beacon.add_recent(device.rssi)
 
         for beacon in BEACONS.values():
-            if beacon.too_close():
+            if beacon.too_close:
                 print(ANSI_RED + f"{beacon.name} is too close ({beacon.recent_moving_average})!" + ANSI_OFF)
             else:
                 print(ANSI_GREEN + f"{beacon.name} is far enough away ({beacon.recent_moving_average})" + ANSI_OFF)
