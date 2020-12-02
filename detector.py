@@ -1,13 +1,7 @@
-#!/usr/bin/env python
-from __future__ import print_function
-import argparse
 import binascii
 from collections import deque
 from dataclasses import dataclass, field
-import os
 import statistics
-import sys
-import time
 from bluepy import btle
 
 ANSI_CSI = "\033["
