@@ -2,6 +2,8 @@
 from __future__ import print_function
 import argparse
 import binascii
+from collections import deque
+from dataclasses import dataclass, field
 import os
 import sys
 import time
@@ -14,6 +16,28 @@ ANSI_YELLOW = ANSI_CSI + '33m'
 ANSI_CYAN = ANSI_CSI + '36m'
 ANSI_WHITE = ANSI_CSI + '37m'
 ANSI_OFF = ANSI_CSI + '0m'
+
+MOVING_AVERAGE_SIZE = 5
+
+@dataclass
+class Beacon:
+    name: str
+    max_rssi: int
+    token_description: str
+    recent: deque = field(default_factory=lambda:deque([-1000], maxlen=MOVING_AVERAGE_SIZE), init=False)
+
+    @property
+    def recent_moving_average(self):
+        return sum(self.recent) / len(self.recent)
+    def add_recent(self, value):
+        self.recent.append(value)
+    def too_close(self):
+        return self.recent_moving_average > self.max_rssi
+
+BEACONS = {
+    '80:e4:da:71:1b:75': Beacon('Minidou', -75, 'Flic button'),
+    'fb:ca:63:b8:c7:2b': Beacon('Rigatoni', -80, 'Fitbit')
+}
 
 class ScanPrint(btle.DefaultDelegate):
 
@@ -38,11 +62,23 @@ class ScanPrint(btle.DefaultDelegate):
                ))
 
 def main():
-    scanner = btle.Scanner(0).withDelegate(ScanPrint())
+    scanner = btle.Scanner(0)
 
     print (ANSI_RED + "Scanning for devices..." + ANSI_OFF)
     while True:
         devices = scanner.scan(1)
+        devices = filter(lambda dev: dev.addr in BEACONS, devices)
+        for device in devices:
+            beacon = BEACONS[device.addr]
+            beacon.add_recent(device.rssi)
+
+        for beacon in BEACONS.values():
+            if beacon.too_close():
+                print(ANSI_RED + f"{beacon.name} is too close ({beacon.recent_moving_average})!" + ANSI_OFF)
+            else:
+                print(ANSI_GREEN + f"{beacon.name} is far enough away ({beacon.recent_moving_average})" + ANSI_OFF)
+
+
 
 if __name__ == "__main__":
     main()
