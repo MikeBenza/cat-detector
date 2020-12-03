@@ -1,7 +1,10 @@
 import binascii
 from collections import deque
 from dataclasses import dataclass, field
+import json
+import logging
 import statistics
+import time
 from bluepy import btle
 
 ANSI_CSI = "\033["
@@ -68,24 +71,26 @@ def main():
     scanner = btle.Scanner(0)
 
     print (ANSI_RED + "Scanning for devices..." + ANSI_OFF)
-    while True:
-        devices = scanner.scan(1.25)
-        devices = filter(lambda dev: dev.addr in BEACONS, devices)
-        beacons_missing = set(BEACONS.keys())
-        for device in devices:
-            beacon = BEACONS[device.addr]
-            beacon.add_recent(device.rssi)
-            beacons_missing.remove(device.addr)
+    with open('scan.log', 'w+') as log:
+        while True:
+            devices = scanner.scan(1.25)
+            devices = filter(lambda dev: dev.addr in BEACONS, devices)
+            beacons_missing = set(BEACONS.keys())
+            for device in devices:
+                beacon = BEACONS[device.addr]
+                beacon.add_recent(device.rssi)
+                log.write(json.dumps({'event_type': 'beacon_detection', 'time': time.time(), 'beacon_name': beacon.name, 'rssi': device.rssi}) + "\n")
+                beacons_missing.remove(device.addr)
 
-        for mac in beacons_missing:
-            beacon = BEACONS[mac]
-            beacon.mark_missing()
+            for mac in beacons_missing:
+                beacon = BEACONS[mac]
+                beacon.mark_missing()
 
-        for beacon in BEACONS.values():
-            if beacon.is_too_close:
-                print(ANSI_RED + f"{beacon.name} is too close ({beacon.recent_moving_average} ({beacon.stdev}))!" + ANSI_OFF)
-            else:
-                print(ANSI_GREEN + f"{beacon.name} is far enough away ({beacon.recent_moving_average} ({beacon.stdev}))" + ANSI_OFF)
+            for beacon in BEACONS.values():
+                if beacon.is_too_close:
+                    print(ANSI_RED + f"{beacon.name} is too close ({beacon.recent_moving_average} ({beacon.stdev}))!" + ANSI_OFF)
+                else:
+                    print(ANSI_GREEN + f"{beacon.name} is far enough away ({beacon.recent_moving_average} ({beacon.stdev}))" + ANSI_OFF)
 
 
 
