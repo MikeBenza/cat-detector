@@ -5,6 +5,8 @@ import json
 import logging
 import statistics
 import time
+import pygame
+import random
 from bluepy import btle
 
 ANSI_CSI = "\033["
@@ -62,16 +64,45 @@ class Beacon:
             if self.recent:
                 self.recent.popleft()
 
+@dataclass
+class Alert:
+    filename: str
+    volume: float
+    max_time: int = 1000
+    sound: pygame.mixer.Sound = field(default=None, init=False)
+
+    def play(self):
+        if not self.sound:
+            self.sound = pygame.mixer.Sound(self.filename)
+            self.sound.set_volume(self.volume)
+        self.sound.play(maxtime=self.max_time)
+
 BEACONS = {
-    '80:e4:da:71:1b:75': Beacon('Minidou', -65, -69, 'Flic button'),
+    '80:e4:da:71:1b:75': Beacon('Rigatoni', -60, -65, 'Flic button'),
 #    'fb:ca:63:b8:c7:2b': Beacon('Rigatoni', -72, -74, 'Fitbit')
 }
+
+ALERTS = [
+    Alert('sounds/breaking-glass.wav', 1, 1000),
+    Alert('sounds/clap.wav', 1, 1500),
+    Alert('sounds/gong.wav', 1, 2000),
+    Alert('sounds/hiss.wav', 1, 3000),
+    Alert('sounds/hf-1.wav', 1, 2000),
+    Alert('sounds/monster.wav', 1, 1000),
+    Alert('sounds/chirp-tone.wav', 3000),
+]
+
+def alert(log):
+    alert = random.choice(ALERTS)
+    print(ANSI_CYAN + f"Playing {alert.filename}" + ANSI_OFF)
+    log.write(json.dumps({'event_type': 'alert', 'time': time.time(), 'alert_filename': alert.filename}) + "\n")
+    alert.play()
 
 def main():
     scanner = btle.Scanner(0)
 
     print (ANSI_RED + "Scanning for devices..." + ANSI_OFF)
-    with open('scan.log', 'w+') as log:
+    with open('scan.log', 'a+') as log:
         while True:
             devices = scanner.scan(1.25)
             devices = filter(lambda dev: dev.addr in BEACONS, devices)
@@ -80,6 +111,7 @@ def main():
                 beacon = BEACONS[device.addr]
                 beacon.add_recent(device.rssi)
                 log.write(json.dumps({'event_type': 'beacon_detection', 'time': time.time(), 'beacon_name': beacon.name, 'rssi': device.rssi}) + "\n")
+                log.flush()
                 beacons_missing.remove(device.addr)
 
             for mac in beacons_missing:
@@ -89,10 +121,12 @@ def main():
             for beacon in BEACONS.values():
                 if beacon.is_too_close:
                     print(ANSI_RED + f"{beacon.name} is too close ({beacon.recent_moving_average} ({beacon.stdev}))!" + ANSI_OFF)
+                    alert(log)
                 else:
                     print(ANSI_GREEN + f"{beacon.name} is far enough away ({beacon.recent_moving_average} ({beacon.stdev}))" + ANSI_OFF)
 
 
 
 if __name__ == "__main__":
+    pygame.init()
     main()
