@@ -7,6 +7,7 @@ import statistics
 import time
 import pygame
 import random
+import requests
 from bluepy import btle
 
 ANSI_CSI = "\033["
@@ -72,14 +73,16 @@ class Alert:
     sound: pygame.mixer.Sound = field(default=None, init=False)
 
     def play(self):
-        if not self.sound:
-            self.sound = pygame.mixer.Sound(self.filename)
-            self.sound.set_volume(self.volume)
-        self.sound.play(maxtime=self.max_time)
+        #if not self.sound:
+        #    self.sound = pygame.mixer.Sound(self.filename)
+        #    self.sound.set_volume(self.volume)
+        #self.sound.play(maxtime=self.max_time)
+        pass
 
 BEACONS = {
-    '80:e4:da:71:1b:75': Beacon('Rigatoni', -60, -65, 'Flic button'),
-#    'fb:ca:63:b8:c7:2b': Beacon('Rigatoni', -72, -74, 'Fitbit')
+    '80:e4:da:71:1b:75': Beacon('Rigatoni', -62, -66, 'Flic button'),
+    'e9:dc:3c:66:5d:8b': Beacon('Minidou', -60, -64, 'Beacon 2'),
+#    'f8:7e:79:c9:06:d7': Beacon('Henry', -49, -53, 'Beacon 1')
 }
 
 ALERTS = [
@@ -94,6 +97,7 @@ ALERTS = [
 
 def alert(log):
     alert = random.choice(ALERTS)
+    requests.post('http://cat-air-sprayer.local/pulse', params={'t': '500'})
     print(ANSI_CYAN + f"Playing {alert.filename}" + ANSI_OFF)
     log.write(json.dumps({'event_type': 'alert', 'time': time.time(), 'alert_filename': alert.filename}) + "\n")
     alert.play()
