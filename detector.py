@@ -8,7 +8,9 @@ import time
 import pygame
 import random
 import requests
+import traceback
 from bluepy import btle
+import RPi.GPIO as GPIO
 
 ANSI_CSI = "\033["
 ANSI_RED = ANSI_CSI + '31m'
@@ -20,6 +22,9 @@ ANSI_OFF = ANSI_CSI + '0m'
 
 MOVING_AVERAGE_SIZE = 5
 MISSING_FACTOR = 3
+RELAY_1_GPIO=4
+PULSE_TIME=0.1
+
 
 @dataclass
 class Beacon:
@@ -77,11 +82,13 @@ class Alert:
         #    self.sound = pygame.mixer.Sound(self.filename)
         #    self.sound.set_volume(self.volume)
         #self.sound.play(maxtime=self.max_time)
+        pulse(PULSE_TIME)
         pass
 
 BEACONS = {
-    '80:e4:da:71:1b:75': Beacon('Rigatoni', -62, -66, 'Flic button'),
-    'e9:dc:3c:66:5d:8b': Beacon('Minidou', -60, -64, 'Beacon 2'),
+#    '80:e4:da:71:1b:75': Beacon('Rigatoni', -62, -66, 'Flic button'),
+#    'e9:dc:3c:66:5d:8b': Beacon('Minidou', -60, -64, 'Beacon 2'),
+    'ff:ff:50:09:4b:d6': Beacon('Tony 2', -57, -66, 'TagIt 1'),
 #    'f8:7e:79:c9:06:d7': Beacon('Henry', -49, -53, 'Beacon 1')
 }
 
@@ -97,13 +104,26 @@ ALERTS = [
 
 def alert(log):
     alert = random.choice(ALERTS)
-    requests.post('http://cat-air-sprayer.local/pulse', params={'t': '500'})
-    print(ANSI_CYAN + f"Playing {alert.filename}" + ANSI_OFF)
+    #requests.post('http://cat-air-sprayer.local/pulse', params={'t': '500'})
+    pulse(PULSE_TIME)
+    #print(ANSI_CYAN + f"Playing {alert.filename}" + ANSI_OFF)
     log.write(json.dumps({'event_type': 'alert', 'time': time.time(), 'alert_filename': alert.filename}) + "\n")
-    alert.play()
+    #alert.play()
+
+def pulse(t):
+    GPIO.output(RELAY_1_GPIO, GPIO.HIGH)
+    time.sleep(t)
+    GPIO.output(RELAY_1_GPIO, GPIO.LOW)
 
 def main():
-    scanner = btle.Scanner(0)
+    try:
+        scanner = btle.Scanner(0)
+    except btle.BTLEManagementError:
+        traceback.print_exc()
+        sys.exit(1)
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(RELAY_1_GPIO, GPIO.OUT)
+
 
     print (ANSI_RED + "Scanning for devices..." + ANSI_OFF)
     with open('scan.log', 'a+') as log:
