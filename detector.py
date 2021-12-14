@@ -20,10 +20,10 @@ ANSI_CYAN = ANSI_CSI + '36m'
 ANSI_WHITE = ANSI_CSI + '37m'
 ANSI_OFF = ANSI_CSI + '0m'
 
-MOVING_AVERAGE_SIZE = 5
+MOVING_AVERAGE_SIZE = 3
 MISSING_FACTOR = 3
 RELAY_1_GPIO=4
-PULSE_TIME=0.1
+PULSE_TIME=0.250
 
 
 @dataclass
@@ -62,7 +62,7 @@ class Beacon:
         return self.too_close
     def add_recent(self, value):
         self.recent.append(value)
-        print(f"Appending {value} to {self.name}")
+        print(f"Appending {value} to {self.name}.  RMA: {self.recent_moving_average}.  {self.max_rssi} - {self.recovery_rssi}")
     def mark_missing(self):
         self.missing -= 1
         if self.missing == 0:
@@ -82,13 +82,13 @@ class Alert:
         #    self.sound = pygame.mixer.Sound(self.filename)
         #    self.sound.set_volume(self.volume)
         #self.sound.play(maxtime=self.max_time)
-        pulse(PULSE_TIME)
+        #pulse(PULSE_TIME)
         pass
 
 BEACONS = {
-#    '80:e4:da:71:1b:75': Beacon('Rigatoni', -62, -66, 'Flic button'),
+    '80:e4:da:71:1b:75': Beacon('Flic', -75, -85, 'Flic button'),
 #    'e9:dc:3c:66:5d:8b': Beacon('Minidou', -60, -64, 'Beacon 2'),
-    'ff:ff:50:09:4b:d6': Beacon('Tony 2', -57, -66, 'TagIt 1'),
+    'ff:ff:50:09:4b:d6': Beacon('Minidou 2', -51, -56, 'TagIt 1'),
 #    'f8:7e:79:c9:06:d7': Beacon('Henry', -49, -53, 'Beacon 1')
 }
 
@@ -128,7 +128,7 @@ def main():
     print (ANSI_RED + "Scanning for devices..." + ANSI_OFF)
     with open('scan.log', 'a+') as log:
         while True:
-            devices = scanner.scan(1.25)
+            devices = scanner.scan(3)
             devices = filter(lambda dev: dev.addr in BEACONS, devices)
             beacons_missing = set(BEACONS.keys())
             for device in devices:
